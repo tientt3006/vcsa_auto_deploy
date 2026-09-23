@@ -1,0 +1,26 @@
+# Environment configuration files containing local environment details
+config.env
+vcsa_vars.env
+*.env.local
+
+# Sensitive runtime files
+*.key
+*.pem
+*.secret
+/dev/shm/*
+
+# Operating System and Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Build and deployment artifacts
+*.iso
+*.ova
+*.vmdk
+/mnt/vcsa_iso/
+/tmp/vcsa*
