@@ -83,18 +83,45 @@ deploy_ubuntu_node() {
     log_success "Ket noi API toi ESXi Host thanh cong."
 
     # Kiem tra may ao da ton tai hay chua
-    if govc vm.info "${UBUNTU_VM_NAME}" &>/dev/null; then
-        log_warn "May ao '${UBUNTU_VM_NAME}' da ton tai tren ESXi Host."
-        read -r -p "Huy bo va tiep tuc su dung may ao cu? (Y/n): " keep_vm
-        keep_vm=${keep_vm:-Y}
-        if [[ "${keep_vm}" =~ ^[yY]([eE][sS])?$ ]]; then
-            unset esxi_password ubuntu_password GOVC_URL
-            return 0
-        else
-            log_error "Vui long doi ten UBUNTU_VM_NAME trong config.env hoac xoa may ao cu tren ESXi."
-            unset esxi_password ubuntu_password GOVC_URL
-            return 1
+    local existing_vm=""
+    # 1. Tim chinh xac duong dan may ao qua govc find
+    existing_vm="$(govc find / -type m -name "${UBUNTU_VM_NAME}" 2>/dev/null || true)"
+    
+    # 2. Neu govc find khong tra ve, kiem tra du phong bang govc vm.info voi dieu kien co thong tin thuc te
+    if [[ -z "${existing_vm}" ]]; then
+        local vm_info_output=""
+        vm_info_output="$(govc vm.info "${UBUNTU_VM_NAME}" 2>/dev/null || true)"
+        if [[ -n "${vm_info_output}" ]] && echo "${vm_info_output}" | grep -qE "Name:[[:space:]]*${UBUNTU_VM_NAME}"; then
+            existing_vm="${UBUNTU_VM_NAME}"
         fi
+    fi
+
+    if [[ -n "${existing_vm}" ]]; then
+        log_warn "May ao '${UBUNTU_VM_NAME}' da ton tai tren ESXi Host (vi tri: ${existing_vm})."
+        echo -e "Cac phuong an xu ly:"
+        echo -e "  ${C_BOLD}[1]${C_RESET} Giu nguyen va tiep tuc su dung may ao hien tai (bo qua buoc tao moi)"
+        echo -e "  ${C_BOLD}[2]${C_RESET} Xoa bo may ao cu (Tat nguon & Destroy) va khoi tao lai tu dau"
+        echo -e "  ${C_BOLD}[3]${C_RESET} Huy bo tien trinh de kiem tra hoac doi ten trong config.env"
+        read -r -p "Vui long chon [1-3] (mac dinh: 1): " vm_action
+        vm_action="${vm_action:-1}"
+        case "${vm_action}" in
+            1)
+                log_info "Giu nguyen may ao '${UBUNTU_VM_NAME}'. Ket thuc tien trinh tao nut mam."
+                unset esxi_password ubuntu_password GOVC_URL
+                return 0
+                ;;
+            2)
+                log_step "Tien hanh tat nguon va xoa may ao cu '${UBUNTU_VM_NAME}' tren ESXi..."
+                govc vm.power -off -force "${UBUNTU_VM_NAME}" 2>/dev/null || true
+                govc vm.destroy "${UBUNTU_VM_NAME}"
+                log_success "Da xoa may ao cu thanh cong. Tiep tuc khoi tao may ao moi."
+                ;;
+            *)
+                log_error "Tien trinh bi huy bo boi nguoi dung."
+                unset esxi_password ubuntu_password GOVC_URL
+                return 1
+                ;;
+        esac
     fi
 
     # 6. Tao tep seed.iso (Cloud-Init NoCloud)
@@ -124,7 +151,9 @@ ssh_pwauth: true
 network:
   version: 2
   ethernets:
-    ens192:
+    all-eth:
+      match:
+        name: "e*"
       dhcp4: false
       addresses:
         - ${UBUNTU_STATIC_IP}/${UBUNTU_PREFIX:-24}
@@ -148,12 +177,13 @@ EOF
     govc import.ova \
         -name="${UBUNTU_VM_NAME}" \
         -ds="${ESXI_DATASTORE}" \
-        -net="${ESXI_NETWORK}"="${ESXI_NETWORK}" \
+        -net="VM Network=${ESXI_NETWORK}" \
         "${UBUNTU_OVA_PATH}"
     log_success "Da import OVA thanh cong."
 
     # 8. Tai seed.iso len Datastore
     log_step "Dang tai seed.iso len Datastore..."
+    govc datastore.mkdir -ds="${ESXI_DATASTORE}" "${UBUNTU_VM_NAME}" 2>/dev/null || true
     govc datastore.upload -ds="${ESXI_DATASTORE}" "${seed_iso}" "${UBUNTU_VM_NAME}/seed.iso"
     rm -rf "${temp_dir}"
 
@@ -161,6 +191,7 @@ EOF
     log_step "Dang gan seed.iso vao o dia CD-ROM ao..."
     govc device.cdrom.add -vm="${UBUNTU_VM_NAME}" 2>/dev/null || true
     govc device.cdrom.insert -vm="${UBUNTU_VM_NAME}" -ds="${ESXI_DATASTORE}" "${UBUNTU_VM_NAME}/seed.iso"
+    govc device.connect -vm="${UBUNTU_VM_NAME}" cdrom-3000 2>/dev/null || true
 
     # 10. Bat nguon may ao
     log_step "Dang bat nguon may ao '${UBUNTU_VM_NAME}'..."
