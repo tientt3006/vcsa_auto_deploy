@@ -50,10 +50,30 @@ deploy_vcsa() {
 
     # 4. Kiem tra tep ISO ton tai
     log_step "Kiem tra tep ISO cai dat VCSA..."
-    if [[ ! -f "${VCSA_ISO_PATH}" ]]; then
-        log_error "Tep ISO VCSA khong ton tai tai: ${VCSA_ISO_PATH}"
-        echo -e "Vui long kiem tra lai duong dan VCSA_ISO_PATH trong config.env hoac mount o dia chua ISO."
-        return 1
+    if [[ -z "${VCSA_ISO_PATH:-}" || ! -f "${VCSA_ISO_PATH}" ]]; then
+        log_warn "Tep ISO VCSA chua ton tai hoac duong dan khong hop le: '${VCSA_ISO_PATH:-<Chua khai bao>}'"
+        echo "Lựa chọn xử lý:"
+        echo "  [1] Tải nhanh tệp ISO từ đường dẫn URL (aria2c / curl)"
+        echo "  [2] Quét và duyệt tệp ISO từ thư mục trên máy"
+        echo "  [0] Hủy bỏ tiến trình triển khai"
+        local iso_opt=""
+        read -r -p "Vui lòng chọn [1/2/0]: " iso_opt
+        case "${iso_opt}" in
+            1)
+                download_iso_from_url "${base_dir}" || return 1
+                ;;
+            2)
+                browse_and_select_iso "${base_dir}" || return 1
+                ;;
+            *)
+                log_info "Đã hủy tiến trình triển khai VCSA."
+                return 1
+                ;;
+        esac
+        if [[ -z "${VCSA_ISO_PATH:-}" || ! -f "${VCSA_ISO_PATH}" ]]; then
+            log_error "Vẫn chưa xác định được tệp ISO VCSA hợp lệ để tiếp tục."
+            return 1
+        fi
     fi
     log_success "Phat hien tep ISO hop le tai: ${VCSA_ISO_PATH}"
 
@@ -91,9 +111,9 @@ deploy_vcsa() {
         return 1
     fi
 
-    # Xu ly bien DNS
-    local primary_dns="${UBUNTU_STATIC_IP:-${VCSA_GATEWAY}}"
-    local secondary_dns="${UBUNTU_DNS_UPSTREAM:-8.8.8.8}"
+    # Xu ly bien DNS (Mac dinh tro ve DNS cua Ubuntu Node neu khong khai bao rieng)
+    local primary_dns="${VCSA_DNS_PRIMARY:-${UBUNTU_STATIC_IP:-${VCSA_GATEWAY}}}"
+    local secondary_dns="${VCSA_DNS_SECONDARY:-${UBUNTU_DNS_UPSTREAM:-8.8.8.8}}"
 
     export ESXI_HOSTNAME ESXI_USERNAME
     export ESXI_PASSWORD="${esxi_password}"

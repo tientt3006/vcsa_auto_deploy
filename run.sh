@@ -29,6 +29,8 @@ source "${LIB_DIR}/02_setup_environment.sh"
 source "${LIB_DIR}/03_deploy_vcsa.sh"
 # shellcheck source=/dev/null
 source "${LIB_DIR}/04_health_check.sh"
+# shellcheck source=/dev/null
+source "${LIB_DIR}/05_iso_manager.sh"
 
 # Nhan dien moi truong dang thuc thi
 detect_environment() {
@@ -86,15 +88,18 @@ show_menu() {
         echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
         echo -e "  ${C_MAGENTA}${C_BOLD}GIAI ĐOẠN 2: TRIỂN KHAI VCENTER VÀ HẠ TẦNG (CORE APPLIANCE DEPLOYMENT)${C_RESET}"
         echo -e "  ${C_BOLD}[3]${C_RESET} Thiết lập môi trường và cấu hình dịch vụ DNS nội bộ (dnsmasq)"
-        echo -e "  ${C_BOLD}[4]${C_RESET} Tự động triển khai vCenter Server Appliance (VCSA) qua CLI"
+        echo -e "  ${C_BOLD}[4]${C_RESET} Tải nhanh tệp ISO VCSA từ liên kết URL (Hỗ trợ đa luồng aria2c)"
+        echo -e "  ${C_BOLD}[5]${C_RESET} Quét và chọn tệp ISO từ thư mục chỉ định (Cập nhật config.env)"
+        echo -e "  ${C_BOLD}[6]${C_RESET} Tự động triển khai vCenter Server Appliance (VCSA) qua CLI"
         echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
         echo -e "  ${C_MAGENTA}${C_BOLD}TIỆN ÍCH VÀ CHẨN ĐOÁN (UTILITIES & DIAGNOSTICS)${C_RESET}"
-        echo -e "  ${C_BOLD}[5]${C_RESET} Kiểm tra sức khỏe, thông tuyến mạng và DNS (Health Check)"
-        echo -e "  ${C_BOLD}[6]${C_RESET} Mở tệp cấu hình biến hạ tầng (Chỉnh sửa config.env)"
+        echo -e "  ${C_BOLD}[7]${C_RESET} Kiểm tra sức khỏe, thông tuyến mạng và DNS (Health Check)"
+        echo -e "  ${C_BOLD}[8]${C_RESET} Quản lý và kiểm tra tệp ISO VCSA (Submenu chi tiết & Mount test)"
+        echo -e "  ${C_BOLD}[9]${C_RESET} Mở tệp cấu hình biến hạ tầng (Chỉnh sửa config.env)"
         echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
         echo -e "  ${C_BOLD}[0]${C_RESET} Thoát chương trình (Exit)"
         echo -e "${C_BLUE}==============================================================================${C_RESET}"
-        echo -n "Vui lòng nhập lựa chọn [0-6]: "
+        echo -n "Vui lòng nhập lựa chọn [0-9]: "
         read -r choice
 
         case "${choice}" in
@@ -119,15 +124,32 @@ show_menu() {
             4)
                 clear || true
                 load_config "${SCRIPT_DIR}" || true
-                deploy_vcsa "${SCRIPT_DIR}" || true
+                download_iso_from_url "${SCRIPT_DIR}" || true
                 pause_menu
                 ;;
             5)
                 clear || true
-                health_check "${SCRIPT_DIR}" || true
+                load_config "${SCRIPT_DIR}" || true
+                browse_and_select_iso "${SCRIPT_DIR}" || true
                 pause_menu
                 ;;
             6)
+                clear || true
+                load_config "${SCRIPT_DIR}" || true
+                deploy_vcsa "${SCRIPT_DIR}" || true
+                pause_menu
+                ;;
+            7)
+                clear || true
+                health_check "${SCRIPT_DIR}" || true
+                pause_menu
+                ;;
+            8)
+                clear || true
+                load_config "${SCRIPT_DIR}" || true
+                manage_vcsa_iso_menu "${SCRIPT_DIR}" || true
+                ;;
+            9)
                 clear || true
                 local editor_cmd="${EDITOR:-nano}"
                 if ! command -v "${editor_cmd}" &>/dev/null; then
@@ -143,7 +165,7 @@ show_menu() {
                 exit 0
                 ;;
             *)
-                log_warn "Lựa chọn không hợp lệ. Vui lòng nhập từ 0 đến 6."
+                log_warn "Lựa chọn không hợp lệ. Vui lòng nhập từ 0 đến 9."
                 sleep 1
                 ;;
         esac

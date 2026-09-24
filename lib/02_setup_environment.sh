@@ -25,7 +25,7 @@ setup_environment() {
     # 3. Cai dat cac goi phan mem phu thuoc tren Ubuntu
     log_step "Cap nhat kho luu tru va cai dat cac goi tien ich bat buoc..."
     apt-get update -y
-    apt-get install -y dnsmasq dnsutils jq gettext-base curl wget psmisc
+    apt-get install -y dnsmasq dnsutils jq gettext-base curl wget psmisc aria2
 
     # 4. Xu ly xung dot cong 53 voi systemd-resolved
     log_step "Kiem tra va giai phong xung dot cong 53 (systemd-resolved)..."

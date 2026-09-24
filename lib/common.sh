@@ -183,3 +183,40 @@ prompt_secret() {
         break
     done
 }
+
+# Cap nhat hoac bo sung gia tri bien trong tep config.env
+update_config_var() {
+    local base_dir="$1"
+    local var_name="$2"
+    local var_value="$3"
+    local config_file="${base_dir}/config.env"
+
+    if [[ ! -f "${config_file}" ]]; then
+        log_error "Tep cau hinh khong ton tai: ${config_file}"
+        return 1
+    fi
+
+    local temp_file
+    temp_file="$(mktemp "${base_dir}/config.env.tmp.XXXXXX")"
+
+    local found=false
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        if [[ "${line}" =~ ^[[:space:]]*${var_name}= ]]; then
+            local comment=""
+            if [[ "${line}" =~ (#.*)$ ]]; then
+                comment=" ${BASH_REMATCH[1]}"
+            fi
+            echo "${var_name}=\"${var_value}\"${comment}" >> "${temp_file}"
+            found=true
+        else
+            echo "${line}" >> "${temp_file}"
+        fi
+    done < "${config_file}"
+
+    if [[ "${found}" == "false" ]]; then
+        echo "${var_name}=\"${var_value}\"" >> "${temp_file}"
+    fi
+
+    mv "${temp_file}" "${config_file}"
+    return 0
+}
