@@ -19,6 +19,7 @@ Thumbs.db
 .vscode/
 
 # Build and deployment artifacts
+build/
 *.iso
 *.ova
 *.vmdk
