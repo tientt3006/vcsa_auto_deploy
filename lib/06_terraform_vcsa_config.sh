@@ -345,9 +345,9 @@ manage_terraform_menu() {
         if [[ -f "${tfvars_file}" ]]; then
             local parsed
             parsed="$(grep -E '^\s*vsphere_server\s*=' "${tfvars_file}" 2>/dev/null | cut -d'=' -f2- | tr -d ' "' || true)"
-            if [[ -n "${parsed}" && ! "${parsed}" =~ ^<.*>$ ]]; then
+            if [[ -n "${parsed}" && "${parsed}" != *"<"*">"* ]]; then
                 current_server="${parsed}"
-            elif [[ "${parsed}" =~ ^<.*>$ ]]; then
+            elif [[ "${parsed}" == *"<"*">"* ]]; then
                 current_server="Chưa điền (${parsed})"
             fi
         fi
