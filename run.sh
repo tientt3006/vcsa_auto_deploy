@@ -31,6 +31,8 @@ source "${LIB_DIR}/03_deploy_vcsa.sh"
 source "${LIB_DIR}/04_health_check.sh"
 # shellcheck source=/dev/null
 source "${LIB_DIR}/05_iso_manager.sh"
+# shellcheck source=/dev/null
+source "${LIB_DIR}/06_terraform_vcsa_config.sh"
 
 # Nhan dien moi truong dang thuc thi
 detect_environment() {
@@ -92,14 +94,19 @@ show_menu() {
         echo -e "  ${C_BOLD}[5]${C_RESET} Quét và chọn tệp ISO từ thư mục chỉ định (Cập nhật config.env)"
         echo -e "  ${C_BOLD}[6]${C_RESET} Tự động triển khai vCenter Server Appliance (VCSA) qua CLI"
         echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
+        echo -e "  ${C_MAGENTA}${C_BOLD}GIAI ĐOẠN 3: CẤU HÌNH TỰ ĐỘNG HẠ TẦNG VCENTER (TERRAFORM DAY-2 PROVISIONING)${C_RESET}"
+        echo -e "  ${C_BOLD}[7]${C_RESET} Lập kế hoạch cấu hình vCenter: Host, Cluster, vDS, RBAC (Terraform Plan)"
+        echo -e "  ${C_BOLD}[8]${C_RESET} Thực thi áp dụng cấu hình tự động toàn diện vCenter (Terraform Apply)"
+        echo -e "  ${C_BOLD}[9]${C_RESET} Quản lý chi tiết Terraform (Submenu cấu hình & Destroy tài nguyên)"
+        echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
         echo -e "  ${C_MAGENTA}${C_BOLD}TIỆN ÍCH VÀ CHẨN ĐOÁN (UTILITIES & DIAGNOSTICS)${C_RESET}"
-        echo -e "  ${C_BOLD}[7]${C_RESET} Kiểm tra sức khỏe, thông tuyến mạng và DNS (Health Check)"
-        echo -e "  ${C_BOLD}[8]${C_RESET} Quản lý và kiểm tra tệp ISO VCSA (Submenu chi tiết & Mount test)"
-        echo -e "  ${C_BOLD}[9]${C_RESET} Mở tệp cấu hình biến hạ tầng (Chỉnh sửa config.env)"
+        echo -e "  ${C_BOLD}[10]${C_RESET} Kiểm tra sức khỏe, thông tuyến mạng và DNS (Health Check)"
+        echo -e "  ${C_BOLD}[11]${C_RESET} Quản lý và kiểm tra tệp ISO VCSA (Submenu chi tiết & Mount test)"
+        echo -e "  ${C_BOLD}[12]${C_RESET} Mở tệp cấu hình biến hạ tầng (Chỉnh sửa config.env)"
         echo -e "${C_BLUE}------------------------------------------------------------------------------${C_RESET}"
         echo -e "  ${C_BOLD}[0]${C_RESET} Thoát chương trình (Exit)"
         echo -e "${C_BLUE}==============================================================================${C_RESET}"
-        echo -n "Vui lòng nhập lựa chọn [0-9]: "
+        echo -n "Vui lòng nhập lựa chọn [0-12]: "
         read -r choice
 
         case "${choice}" in
@@ -141,15 +148,29 @@ show_menu() {
                 ;;
             7)
                 clear || true
-                health_check "${SCRIPT_DIR}" || true
+                terraform_plan_action "${SCRIPT_DIR}" || true
                 pause_menu
                 ;;
             8)
                 clear || true
+                terraform_apply_action "${SCRIPT_DIR}" || true
+                pause_menu
+                ;;
+            9)
+                clear || true
+                manage_terraform_menu "${SCRIPT_DIR}" || true
+                ;;
+            10)
+                clear || true
+                health_check "${SCRIPT_DIR}" || true
+                pause_menu
+                ;;
+            11)
+                clear || true
                 load_config "${SCRIPT_DIR}" || true
                 manage_vcsa_iso_menu "${SCRIPT_DIR}" || true
                 ;;
-            9)
+            12)
                 clear || true
                 local editor_cmd="${EDITOR:-nano}"
                 if ! command -v "${editor_cmd}" &>/dev/null; then
@@ -165,7 +186,7 @@ show_menu() {
                 exit 0
                 ;;
             *)
-                log_warn "Lựa chọn không hợp lệ. Vui lòng nhập từ 0 đến 9."
+                log_warn "Lựa chọn không hợp lệ. Vui lòng nhập từ 0 đến 12."
                 sleep 1
                 ;;
         esac

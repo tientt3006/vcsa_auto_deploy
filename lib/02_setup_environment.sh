@@ -22,12 +22,7 @@ setup_environment() {
         return 1
     fi
 
-    # 3. Cai dat cac goi phan mem phu thuoc tren Ubuntu
-    log_step "Cap nhat kho luu tru va cai dat cac goi tien ich bat buoc..."
-    apt-get update -y
-    apt-get install -y dnsmasq dnsutils jq gettext-base curl wget psmisc aria2
-
-    # 4. Xu ly xung dot cong 53 voi systemd-resolved
+    # 3. Xu ly xung dot cong 53 voi systemd-resolved truoc khi cai dat dnsmasq
     log_step "Kiem tra va giai phong xung dot cong 53 (systemd-resolved)..."
     if ss -tulpn | grep -q ":53 "; then
         log_info "Phat hien tien trinh dang lang nghe tren cong 53. Tien hanh cau hinh DNSStubListener=no..."
@@ -35,9 +30,14 @@ setup_environment() {
             sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf || true
             sed -i 's/DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf || true
             systemctl restart systemd-resolved || true
-            log_success "Da tat DNSStubListener cua systemd-resolved."
+            log_success "Da tat DNSStubListener cua systemd-resolved de giai phong cong 53."
         fi
     fi
+
+    # 4. Cai dat cac goi phan mem phu thuoc tren Ubuntu
+    log_step "Cap nhat kho luu tru va cai dat cac goi tien ich bat buoc..."
+    apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y dnsmasq dnsutils jq gettext-base curl wget psmisc aria2
 
     # 5. Tinh toan ban ghi phan giai thuan va nghich (PTR)
     local o1 o2 o3 o4

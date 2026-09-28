@@ -1,0 +1,246 @@
+# ==============================================================================
+# TỆP THAM SỐ CẤU HÌNH HẠ TẦNG VCENTER TOÀN DIỆN (terraform.tfvars.example)
+# Dành cho quy trình tự động hóa cấu hình vSphere vCenter (Day-2 Provisioning)
+#
+# Hướng dẫn sử dụng:
+#   1. Sao chép tệp này thành 'terraform.tfvars':
+#        cp terraform.tfvars.example terraform.tfvars
+#   2. Điền đầy đủ các giá trị thực tế thay cho các ký tự giữ chỗ dạng <...>
+#   3. Kịch bản run.sh sẽ tự động kiểm tra xem tệp còn placeholder dạng <...> hay không.
+#      Nếu còn, hệ thống sẽ yêu cầu hoàn tất điền trước khi thực thi Plan hoặc Apply.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. THÔNG TIN KẾT NỐI VCENTER SERVER
+# ------------------------------------------------------------------------------
+# Địa chỉ IP hoặc FQDN của vCenter Server vừa được triển khai (Ví dụ: 10.255.245.107)
+vsphere_server = "<VCSA_IP_OR_FQDN>"
+
+# Tài khoản quản trị vCenter Single Sign-On (Mặc định: administrator@vsphere.local)
+vsphere_user = "administrator@vsphere.local"
+
+# Mật khẩu quản trị vCenter Single Sign-On đã thiết lập khi cài đặt VCSA
+vsphere_password = "<VCSA_SSO_ADMIN_PASSWORD>"
+
+# Cho phép kết nối với chứng chỉ SSL tự ký của vCenter (true / false)
+vsphere_allow_unverified_ssl = true
+
+# ------------------------------------------------------------------------------
+# 2. KHỞI TẠO DATACENTER VÀ HỆ THỐNG THƯ MỤC MÁY ẢO (VM FOLDERS)
+# ------------------------------------------------------------------------------
+# Tên Datacenter quản lý chính
+datacenter_name = "Datacenter-01"
+
+# Danh sách tên các thư mục máy ảo cần tạo phân cấp quản lý
+vm_folders = [
+  "Management",
+  "Core-Infra",
+  "Workloads-Production",
+  "Workloads-Staging",
+  "Workloads-Dev",
+  "Templates"
+]
+
+# ------------------------------------------------------------------------------
+# 3. CẤU HÌNH CỤM TÍNH TOÁN (COMPUTE CLUSTER), DRS, HA & ADMISSION CONTROL
+# ------------------------------------------------------------------------------
+# Có khởi tạo Compute Cluster hay không:
+#   - true : Tạo cụm tính toán Cluster và nạp các máy chủ ESXi vào trong cụm này.
+#   - false: Không tạo cụm; nạp trực tiếp các máy chủ ESXi độc lập vào Datacenter.
+create_cluster = true
+
+# Tên của cụm tính toán
+cluster_name = "Cluster-01"
+
+# Cấu hình vSphere DRS (Distributed Resource Scheduler)
+drs_enabled             = true
+drs_automation_level    = "fullyAutomated"     # fullyAutomated, partiallyAutomated, manual
+drs_migration_threshold = 3                    # Ngưỡng di trú tài nguyên: từ 1 (Bảo thủ) đến 5 (Tích cực)
+
+# Cấu hình vSphere HA (High Availability)
+# Lưu ý: Cụm kiểm thử phòng lab chỉ có 1 ESXi Host nên để ha_enabled = false
+ha_enabled          = false
+ha_host_monitoring  = "enabled"                # enabled / disabled
+ha_vm_monitoring    = "vmMonitoringDisabled"   # vmMonitoringDisabled, vmMonitoringOnly, vmAndAppMonitoring
+
+# Cấu hình kiểm soát dung lượng dự phòng HA (HA Admission Control)
+ha_admission_control_policy                 = "resourcePercentage" # resourcePercentage, slotPolicy, failoverHosts, disabled
+ha_admission_control_host_failure_tolerance = 1                    # Số host dự phòng sự cố
+ha_admission_control_cpu_percentage         = 25                   # Tỷ lệ phần trăm CPU dự trữ (%)
+ha_admission_control_ram_percentage         = 25                   # Tỷ lệ phần trăm RAM dự trữ (%)
+
+# ------------------------------------------------------------------------------
+# 4. DANH SÁCH MÁY CHỦ ESXI CẦN NẠP VÀO QUẢN LÝ (ESXI HOST ONBOARDING)
+# ------------------------------------------------------------------------------
+# Khai báo danh sách các máy chủ ESXi (Hệ thống sẽ tự động quét SSL Thumbprint)
+esxi_hosts = [
+  {
+    hostname = "<ESXI_1_IP_OR_FQDN>"
+    username = "root"
+    password = "<ESXI_1_ROOT_PASSWORD>"
+  }
+  # Có thể bổ sung thêm các node ESXi khác nếu hạ tầng có nhiều máy chủ:
+  # ,
+  # {
+  #   hostname = "10.255.245.103"
+  #   username = "root"
+  #   password = "MatKhauESXiHost2"
+  # }
+]
+
+# ------------------------------------------------------------------------------
+# 5. CẤU HÌNH MẠNG PHÂN TÁN (VSPHERE DISTRIBUTED SWITCH - VDS)
+# ------------------------------------------------------------------------------
+# Có khởi tạo vSphere Distributed Switch hay không:
+#   - true : Khởi tạo vDS trên Datacenter với các cổng Uplink và Distributed Port Groups.
+#   - false: Bỏ qua không tạo vDS.
+create_vds = true
+
+# Tên của bộ chuyển mạch phân tán vDS
+vds_name = "VDS-Core-01"
+
+# Danh sách tên các cổng kết nối vật lý Uplink trên vDS
+vds_uplinks         = ["uplink1", "uplink2"]
+vds_active_uplinks  = ["uplink1"]
+vds_standby_uplinks = ["uplink2"]
+
+# Card mạng vật lý trên ESXi Host cần gán vào Uplink vDS (Ví dụ: ["vmnic1"]).
+# Để danh sách rỗng [] nếu chưa muốn gán card vật lý ngay lúc khởi tạo.
+vds_physical_nics = []
+
+# Kích hoạt Network I/O Control (NetIOC phiên bản 3) để quản trị QoS băng thông mạng
+enable_netioc = true
+
+# Danh mục các Distributed Port Groups trên vDS:
+#   - vlan_id: 0 (Untagged), 1 - 4094 (VLAN Tagging), 4095 (VLAN Trunking)
+#   - teaming_policy: loadbalance_loadbased, loadbalance_srcid, loadbalance_srcmac, failover_explicit
+#   - shaping_enabled: Bật/tắt kiểm soát giới hạn băng thông lưu lượng (Traffic Shaping)
+#   - allow_promiscuous: Cho phép chế độ nghe lén (Promiscuous Mode) cho VM router/firewall
+vds_portgroups = {
+  "DSwitch-Mgmt-PG" = {
+    vlan_id                           = 0
+    teaming_policy                    = "loadbalance_loadbased"
+    shaping_enabled                   = false
+    ingress_shaping_average_bandwidth = 100000000
+    ingress_shaping_peak_bandwidth    = 200000000
+    ingress_shaping_burst_size        = 10485760
+    egress_shaping_average_bandwidth  = 100000000
+    egress_shaping_peak_bandwidth     = 200000000
+    egress_shaping_burst_size         = 10485760
+    allow_promiscuous                 = false
+  },
+  "DSwitch-vMotion-PG" = {
+    vlan_id                           = 10
+    teaming_policy                    = "loadbalance_loadbased"
+    shaping_enabled                   = false
+    ingress_shaping_average_bandwidth = 100000000
+    ingress_shaping_peak_bandwidth    = 200000000
+    ingress_shaping_burst_size        = 10485760
+    egress_shaping_average_bandwidth  = 100000000
+    egress_shaping_peak_bandwidth     = 200000000
+    egress_shaping_burst_size         = 10485760
+    allow_promiscuous                 = false
+  },
+  "DSwitch-Workload-Prod-PG" = {
+    vlan_id                           = 20
+    teaming_policy                    = "loadbalance_loadbased"
+    shaping_enabled                   = true
+    ingress_shaping_average_bandwidth = 500000000
+    ingress_shaping_peak_bandwidth    = 1000000000
+    ingress_shaping_burst_size        = 20971520
+    egress_shaping_average_bandwidth  = 500000000
+    egress_shaping_peak_bandwidth     = 1000000000
+    egress_shaping_burst_size         = 20971520
+    allow_promiscuous                 = false
+  },
+  "DSwitch-Workload-Dev-PG" = {
+    vlan_id                           = 30
+    teaming_policy                    = "loadbalance_loadbased"
+    shaping_enabled                   = false
+    ingress_shaping_average_bandwidth = 100000000
+    ingress_shaping_peak_bandwidth    = 200000000
+    ingress_shaping_burst_size        = 10485760
+    egress_shaping_average_bandwidth  = 100000000
+    egress_shaping_peak_bandwidth     = 200000000
+    egress_shaping_burst_size         = 10485760
+    allow_promiscuous                 = false
+  }
+}
+
+# ------------------------------------------------------------------------------
+# 6. CẤU HÌNH MẠNG TIÊU CHUẨN (STANDARD VSWITCH - VSS)
+# ------------------------------------------------------------------------------
+# Có khởi tạo Standard vSwitch trên từng máy chủ ESXi hay không:
+#   - true : Khởi tạo Standard Switch và Port Groups trên toàn bộ các Host đã nạp.
+#   - false: Không tạo Standard Switch mới (mặc định vSwitch0 có sẵn trên ESXi).
+create_standard_vswitches = false
+
+# Bản đồ các Standard Switch cần khởi tạo bổ sung trên Host
+standard_vswitches = {
+  # "vSwitch1" = {
+  #   network_adapters = ["vmnic2", "vmnic3"]
+  #   active_nics      = ["vmnic2"]
+  #   standby_nics     = ["vmnic3"]
+  #   mtu              = 1500
+  # }
+}
+
+# Bản đồ các Standard Port Groups gắn vào Standard Switch tương ứng
+standard_portgroups = {
+  # "Standard-Storage-PG" = {
+  #   vswitch_name = "vSwitch1"
+  #   vlan_id      = 40
+  # }
+}
+
+# ------------------------------------------------------------------------------
+# 7. KHO LƯU TRỮ, STORAGE I/O CONTROL (SIOC) & CONTENT LIBRARY
+# ------------------------------------------------------------------------------
+# Tên Datastore vật lý hiện có trên ESXi để lưu Content Library (Ví dụ: SRV03_Z620_DS)
+primary_datastore_name = "<PRIMARY_DATASTORE_NAME>"
+
+# Khởi tạo thư viện nội dung vSphere Content Library cục bộ
+create_content_library = true
+content_library_name   = "VCSA-Core-Content-Library"
+
+# Tùy chọn tạo cụm kho lưu trữ Datastore Cluster tích hợp Storage DRS & Storage I/O Control (SIOC)
+create_datastore_cluster  = false
+datastore_cluster_name    = "Datastore-Cluster-01"
+sdrs_enabled              = true
+sdrs_automation_level     = "fullyAutomated"
+sdrs_io_latency_threshold = 15                 # Ngưỡng trễ I/O Control tính bằng ms (Storage I/O Control)
+
+# ------------------------------------------------------------------------------
+# 8. PHÂN QUYỀN VAI TRÒ TÙY BIẾN (CUSTOM ROLES & PERMISSIONS RBAC)
+# ------------------------------------------------------------------------------
+# Định nghĩa các vai trò quản trị phân quyền tùy biến không giới hạn:
+custom_roles = {
+  "DevOps-Automation-Engineer" = {
+    role_privileges = [
+      "Datastore.AllocateSpace",
+      "Network.Assign",
+      "System.Anonymous",
+      "System.Read",
+      "System.View",
+      "VirtualMachine.Config.AddNewDisk",
+      "VirtualMachine.Config.AddRemoveDevice",
+      "VirtualMachine.Config.AdvancedConfig",
+      "VirtualMachine.Config.CPUCount",
+      "VirtualMachine.Config.Memory",
+      "VirtualMachine.Interact.PowerOff",
+      "VirtualMachine.Interact.PowerOn",
+      "VirtualMachine.Interact.Reset",
+      "VirtualMachine.Inventory.Create",
+      "VirtualMachine.Inventory.Delete",
+      "VirtualMachine.Provisioning.Clone",
+      "VirtualMachine.Provisioning.DeployTemplate"
+    ]
+  },
+  "Security-Auditor-ReadOnly" = {
+    role_privileges = [
+      "System.Anonymous",
+      "System.Read",
+      "System.View"
+    ]
+  }
+}

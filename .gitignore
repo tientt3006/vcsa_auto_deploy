@@ -25,3 +25,13 @@ build/
 *.vmdk
 /mnt/vcsa_iso/
 /tmp/vcsa*
+
+# Terraform runtime and state files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.auto.tfvars
+
