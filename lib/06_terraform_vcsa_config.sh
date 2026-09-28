@@ -86,6 +86,22 @@ ensure_terraform_tfvars() {
     return 0
 }
 
+# Đảm bảo môi trường Terraform Provider đã được khởi tạo (terraform init)
+ensure_terraform_initialized() {
+    local base_dir="$1"
+    local tf_dir="${base_dir}/terraform"
+
+    if [[ ! -d "${tf_dir}/.terraform" || ! -f "${tf_dir}/.terraform.lock.hcl" ]]; then
+        log_step "Khởi tạo môi trường nhà cung cấp Terraform (Tự động chạy 'terraform init')..."
+        if ! (cd "${tf_dir}" && terraform init -input=false); then
+            log_error "Lỗi khởi tạo Terraform Provider qua 'terraform init'. Vui lòng kiểm tra kết nối mạng Internet."
+            return 1
+        fi
+        log_success "Đã khởi tạo thành công môi trường Terraform Provider."
+    fi
+    return 0
+}
+
 # Kiểm tra lặp (validation loop) đến khi người dùng điền hết toàn bộ placeholder <...>
 validate_and_prompt_tfvars() {
     local base_dir="$1"
@@ -93,6 +109,7 @@ validate_and_prompt_tfvars() {
     local tfvars_file="${tf_dir}/terraform.tfvars"
 
     ensure_terraform_tfvars "${base_dir}" || return 1
+    ensure_terraform_initialized "${base_dir}" || return 1
 
     local editor_cmd="${EDITOR:-nano}"
     if ! command -v "${editor_cmd}" &>/dev/null; then
@@ -149,6 +166,16 @@ validate_and_prompt_tfvars() {
         log_step "Kiểm tra cú pháp cấu hình Terraform (terraform validate)..."
         local validate_output=""
         if ! validate_output="$(cd "${tf_dir}" && terraform validate 2>&1)"; then
+            # Tự động khắc phục nếu phát hiện thiếu provider plugin
+            if echo "${validate_output}" | grep -qi "Missing required provider"; then
+                log_warn "Phát hiện thiếu plugin provider. Tiến hành 'terraform init' tự động..."
+                if (cd "${tf_dir}" && terraform init -input=false); then
+                    validate_output="$(cd "${tf_dir}" && terraform validate 2>&1)" || true
+                fi
+            fi
+        fi
+
+        if ! (cd "${tf_dir}" && terraform validate &>/dev/null); then
             echo ""
             log_error "Phát hiện lỗi cú pháp trong cấu hình Terraform:"
             echo -e "${C_RED}${validate_output}${C_RESET}"
