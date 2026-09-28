@@ -314,6 +314,7 @@ terraform_apply_action() {
         return 0
     fi
 
+    local apply_status=0
     (
         cd "${tf_dir}"
         if [[ -f "tfplan.binary" ]]; then
@@ -322,7 +323,14 @@ terraform_apply_action() {
         else
             terraform apply -auto-approve
         fi
-    )
+    ) || apply_status=$?
+
+    if [[ ${apply_status} -ne 0 ]]; then
+        echo ""
+        log_error "Quá trình thực thi 'terraform apply' không thành công (Mã lỗi: ${apply_status})."
+        log_warn "Vui lòng kiểm tra lại log chi tiết lỗi ở trên để xử lý."
+        return ${apply_status}
+    fi
 
     echo ""
     log_success "=========================================================================="
@@ -352,10 +360,18 @@ terraform_destroy_action() {
         return 0
     fi
 
+    local destroy_status=0
     (
         cd "${tf_dir}"
         terraform destroy -auto-approve
-    )
+    ) || destroy_status=$?
+
+    if [[ ${destroy_status} -ne 0 ]]; then
+        echo ""
+        log_error "Quá trình thực thi 'terraform destroy' không thành công (Mã lỗi: ${destroy_status})."
+        return ${destroy_status}
+    fi
+
     log_success "Đã gỡ bỏ toàn bộ tài nguyên cấu hình Terraform."
 }
 
