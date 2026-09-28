@@ -5,7 +5,7 @@
 resource "vsphere_compute_cluster" "cluster" {
   count         = var.create_cluster ? 1 : 0
   name          = var.cluster_name
-  datacenter_id = vsphere_datacenter.dc.id
+  datacenter_id = vsphere_datacenter.dc.moid
 
   # ----------------------------------------------------------------------------
   # Cấu hình vSphere DRS (Distributed Resource Scheduler)

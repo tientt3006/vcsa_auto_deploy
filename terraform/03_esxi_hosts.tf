@@ -18,7 +18,7 @@ resource "vsphere_host" "hosts" {
   thumbprint = data.vsphere_host_thumbprint.thumbprint[each.key].id
 
   cluster    = var.create_cluster ? vsphere_compute_cluster.cluster[0].id : null
-  datacenter = var.create_cluster ? null : vsphere_datacenter.dc.id
+  datacenter = var.create_cluster ? null : vsphere_datacenter.dc.moid
 
   # Bỏ qua thay đổi mật khẩu sau khi nạp để tránh kích hoạt lại quy trình reconnect
   lifecycle {

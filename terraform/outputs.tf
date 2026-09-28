@@ -4,7 +4,7 @@
 
 output "datacenter_id" {
   description = "Managed Object ID của Datacenter"
-  value       = vsphere_datacenter.dc.id
+  value       = vsphere_datacenter.dc.moid
 }
 
 output "cluster_id" {

@@ -8,7 +8,7 @@
 resource "vsphere_distributed_virtual_switch" "vds" {
   count         = var.create_vds ? 1 : 0
   name          = var.vds_name
-  datacenter_id = vsphere_datacenter.dc.id
+  datacenter_id = vsphere_datacenter.dc.moid
 
   # Cấu hình Uplinks và Teaming mặc định
   uplinks         = var.vds_uplinks

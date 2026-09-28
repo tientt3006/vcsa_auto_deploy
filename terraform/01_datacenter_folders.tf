@@ -12,5 +12,5 @@ resource "vsphere_folder" "vm_folders" {
   for_each      = toset(var.vm_folders)
   path          = each.value
   type          = "vm"
-  datacenter_id = vsphere_datacenter.dc.id
+  datacenter_id = vsphere_datacenter.dc.moid
 }

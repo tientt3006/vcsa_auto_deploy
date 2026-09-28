@@ -8,7 +8,7 @@
 resource "vsphere_datastore_cluster" "datastore_cluster" {
   count         = var.create_datastore_cluster ? 1 : 0
   name          = var.datastore_cluster_name
-  datacenter_id = vsphere_datacenter.dc.id
+  datacenter_id = vsphere_datacenter.dc.moid
 
   # Cấu hình Storage DRS (SDRS)
   sdrs_enabled          = var.sdrs_enabled
@@ -25,7 +25,7 @@ resource "vsphere_datastore_cluster" "datastore_cluster" {
 data "vsphere_datastore" "primary_ds" {
   count         = (var.create_content_library && var.primary_datastore_name != "") ? 1 : 0
   name          = var.primary_datastore_name
-  datacenter_id = vsphere_datacenter.dc.id
+  datacenter_id = vsphere_datacenter.dc.moid
 
   depends_on = [vsphere_host.hosts]
 }
