@@ -41,6 +41,8 @@ Toàn bộ các mục trong tầng này được định nghĩa bằng mã ngu�
   *Công cụ:* Terraform resource `vsphere_distributed_port_group`. | *Phụ thuộc:* Không.
 - [ ] **NET-05 - Kiểm soát trần băng thông mạng (Traffic Shaping):** Cấu hình giới hạn băng thông trung bình (Average), băng thông đỉnh (Peak) và Burst Size cho các nhóm tải phụ để chống chiếm dụng đường truyền.  
   *Công cụ:* Terraform resource `vsphere_distributed_port_group`. | *Phụ thuộc:* Không.
+- [ ] **NET-06 - Kích hoạt Multi-NIC vMotion:** Khởi tạo 2 cổng VMkernel dành cho vMotion trên 2 card Uplink vật lý độc lập để tăng gấp đôi băng thông và tốc độ di trú máy ảo. Cấu hình 2 Port Groups gán Teaming Active/Standby so le, sau đó tạo 2 VMkernel NICs với cờ dịch vụ vMotion.  
+  *Công cụ:* Terraform resources `vsphere_distributed_port_group`, `vsphere_vnic` (`services = ["vmotion"]`). | *Phụ thuộc:* Không.
 
 ### 1.3. Kho lưu trữ và phân quyền (Storage SDRS/SIOC & RBAC)
 - [ ] **STO-01 - Cụm kho lưu trữ Datastore Cluster và Storage DRS:** Gom các VMFS Datastore vào cụm, kích hoạt Storage DRS chế độ `fullyAutomated` để tự động di trú cân bằng dung lượng đĩa.  
@@ -54,9 +56,9 @@ Toàn bộ các mục trong tầng này được định nghĩa bằng mã ngu�
 
 ---
 
-## Tầng 2: Triển khai tự động nội bộ qua CLI / Script (Tự động hóa 100% - Không phụ thuộc dịch vụ ngoài)
+## Tầng 2: Triển khai tự động nội bộ qua CLI / API / Script (Tự động hóa 100% - Không phụ thuộc dịch vụ ngoài)
 
-Các cấu hình nội bộ máy chủ VCSA và ESXi Host, không cần dịch vụ bên ngoài, thực thi tự động qua tiện ích dòng lệnh, Host Profile, REST API hoặc Ansible.
+Các cấu hình nội bộ máy chủ VCSA và ESXi Host không cần dịch vụ ngoài, nhưng không có native resource trong provider chính thức `hashicorp/vsphere`. Các hạng mục này được thực thi tự động qua vCenter REST API, VAMI API (port 5480), PowerCLI hoặc `terraform_data` (gọi cURL).
 
 - [ ] **STO-04 - Chuyển chính sách đa đường truyền SAN sang Round Robin:** Đổi cơ chế chọn đường truyền Native Multipathing Plugin (NMP) sang `VMW_PSP_RR` với tham số chuyển mạch `iops=1` để tối ưu hóa hiệu năng LUN lưu trữ iSCSI / FC.  
   *Lệnh CLI:* `esxcli storage nmp satp setbootpath --satp VMW_SATP_ALUA --psp VMW_PSP_RR`. | *Phụ thuộc:* Không.
@@ -64,16 +66,14 @@ Các cấu hình nội bộ máy chủ VCSA và ESXi Host, không cần dịch v
   *Lệnh CLI:* `esxcli system syslog config set --logdir=/vmfs/volumes/<Datastore>/scratch/log`. | *Phụ thuộc:* Không.
 - [ ] **STO-06 - Kích hoạt thu hồi dung lượng đĩa tự động (Automatic UNMAP):** Đảm bảo cơ chế gửi lệnh SCSI UNMAP mức ưu tiên thấp (Priority: Low) hoạt động trên toàn bộ các VMFS-6 Datastores để giải phóng khối dữ liệu rác về SAN Storage.  
   *Trạng thái:* Tự động kích hoạt mặc định trên VMFS-6. | *Phụ thuộc:* Không.
-- [ ] **NET-06 - Kích hoạt Multi-NIC vMotion:** Khởi tạo 2 cổng VMkernel dành cho vMotion trên 2 card Uplink vật lý độc lập để tăng gấp đôi băng thông và tốc độ di trú máy ảo.  
-  *Lệnh CLI:* PowerCLI `New-VMHostNetworkAdapter -VMotionEnabled $true`. | *Phụ thuộc:* Không.
-- [ ] **SEC-02 - Vô hiệu hóa dịch vụ SSH và đặt Shell Timeout:** Tắt dịch vụ SSH trên VCSA (`Access.SSH = false`) và trên các máy chủ ESXi Host (`vim-cmd hostsvc/enable_ssh false`). Đặt thời gian tự động thoát phiên nhàn rỗi là 900 giây (15 phút).  
-  *Công cụ:* Script CLI / PowerCLI `Set-VMHostService`. | *Phụ thuộc:* Không.
+- [ ] **SEC-02 - Vô hiệu hóa dịch vụ SSH và đặt Shell Timeout:** Tắt dịch vụ SSH trên VCSA (`Access.SSH = false` qua VAMI API) và trên các máy chủ ESXi Host (`TSM-SSH` qua HostServiceSystem). Đặt thời gian tự động thoát phiên nhàn rỗi là 900 giây (`UserVars.ESXiShellTimeOut = 900`).  
+  *Công cụ:* VAMI REST API `POST /api/appliance/access/ssh`, PowerCLI `Set-VMHostService` hoặc Script CLI. (Lý do tầng 2: Terraform `hashicorp/vsphere` không quản lý dịch vụ hệ điều hành ESXi và cổng VAMI 5480 của VCSA). | *Phụ thuộc:* Không.
 - [ ] **SEC-03 - Kích hoạt chế độ khóa máy chủ ESXi (Lockdown Mode):** Bật `Normal Lockdown Mode` trên toàn bộ các ESXi Hosts để ngăn chặn việc đăng nhập trực tiếp ngoài tầm kiểm soát của vCenter.  
-  *Công cụ:* PowerCLI `Set-VMHost -LockdownMode Normal`. | *Phụ thuộc:* Không.
+  *Công cụ:* PowerCLI `Set-VMHost -LockdownMode Normal` hoặc vSphere API `HostAccessManager`. | *Phụ thuộc:* Không.
 - [ ] **SEC-04 - Khóa các giao thức mã hóa yếu (TLS Hardening):** Chạy công cụ `tls-configurator.sh` trên VCSA để vô hiệu hóa toàn bộ TLS 1.0 và TLS 1.1, chỉ cho phép TLS 1.2 và TLS 1.3.  
   *Lệnh CLI:* `/usr/lib/vmware-tether/bin/tls-configurator.sh vpxd set-ciphers ...` | *Phụ thuộc:* Không.
 - [ ] **SEC-05 - Vô hiệu hóa tính năng gửi telemetry (CEIP):** Tắt chương trình Customer Experience Improvement Program để ngăn chặn việc gửi dữ liệu ra ngoài Internet.  
-  *Công cụ:* vCenter REST API `com.vmware.cis.telemetry.c11n`. | *Phụ thuộc:* Không.
+  *Công cụ:* vCenter REST API `POST /api/telemetry/c11n` hoặc `terraform_data` / cURL. (Lý do tầng 2: `hashicorp/vsphere` không có native resource cho CEIP). | *Phụ thuộc:* Không.
 - [ ] **MON-01 - Cấu hình dịch vụ ghi nhận lỗi nhân mạng (Network Core Dump):** Cấu hình dịch vụ `netdump` trên từng ESXi Host để khi gặp lỗi màn hình tím (PSOD), tệp crash dump được truyền tự động về dịch vụ Dump Collector trên vCenter.  
   *Lệnh CLI:* `esxcli system coredump network set --interface-name vmk0 --server-ipv4 <VCSA_IP> --server-port 6500 --enable true`. | *Phụ thuộc:* Không.
 
