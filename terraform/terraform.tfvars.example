@@ -73,8 +73,17 @@ ha_admission_control_ram_percentage         = 25                   # Tỷ lệ p
 #   - allFeasibleBackup: vCenter tự động chọn các Datastore dùng chung khả dụng (Khuyến nghị cho phần lớn hạ tầng)
 #   - userSelectedDs: Bắt buộc dùng danh sách Datastore do người dùng chỉ định tại ha_heartbeat_datastore_ids
 #   - allFeasibleBackupWithUserPreference: Ưu tiên Datastore người dùng chỉ định, nếu thiếu tự động bổ sung
+# Lưu ý: Nếu cụm KHÔNG CÓ Datastore dùng chung (chỉ có Local Storage) nhưng vẫn muốn bật HA,
+# hãy giữ "allFeasibleBackup" và khai báo das.ignoreInsufficientHbDatastore = "true" bên dưới để tắt cảnh báo vàng.
 ha_heartbeat_datastore_policy = "allFeasibleBackup"
 # ha_heartbeat_datastore_ids    = ["datastore-101", "datastore-102"] # Bỏ chú thích nếu dùng userSelectedDs
+
+# Cấu hình tham số nâng cao cho vSphere HA (HA Advanced Options)
+# Dùng để tinh chỉnh các cờ hệ thống HA của VMware.
+# Ví dụ: Nếu cụm chỉ dùng ổ đĩa cục bộ (Local Storage), bỏ chú thích dòng bên dưới để tắt cảnh báo thiếu Heartbeat Datastore:
+ha_advanced_options = {
+  # "das.ignoreInsufficientHbDatastore" = "true"
+}
 
 # Quy tắc phân tách máy ảo dự phòng (DRS VM Anti-Affinity Rules - HA-05)
 # Tự động phân tách các cặp máy ảo chạy dự phòng không nằm chung trên một máy chủ vật lý.

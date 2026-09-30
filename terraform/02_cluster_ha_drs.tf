@@ -34,6 +34,11 @@ resource "vsphere_compute_cluster" "cluster" {
   # ----------------------------------------------------------------------------
   ha_heartbeat_datastore_policy = var.ha_heartbeat_datastore_policy
   ha_heartbeat_datastore_ids    = var.ha_heartbeat_datastore_ids
+
+  # ----------------------------------------------------------------------------
+  # Cấu hình tham số nâng cao vSphere HA (HA Advanced Options)
+  # ----------------------------------------------------------------------------
+  ha_advanced_options = length(var.ha_advanced_options) > 0 ? var.ha_advanced_options : null
 }
 
 # ------------------------------------------------------------------------------

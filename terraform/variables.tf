@@ -141,6 +141,12 @@ variable "vm_anti_affinity_rules" {
   default = {}
 }
 
+variable "ha_advanced_options" {
+  description = "Bản đồ các tham số nâng cao vSphere HA (Ví dụ: {\"das.ignoreInsufficientHbDatastore\" = \"true\"})"
+  type        = map(string)
+  default     = {}
+}
+
 # ------------------------------------------------------------------------------
 # 4. DANH SÁCH MÁY CHỦ ESXI NẠP VÀO QUẢN LÝ (HOST ONBOARDING)
 # ------------------------------------------------------------------------------
