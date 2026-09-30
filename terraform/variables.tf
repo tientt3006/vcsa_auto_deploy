@@ -119,6 +119,28 @@ variable "ha_admission_control_ram_percentage" {
   default     = 25
 }
 
+variable "ha_heartbeat_datastore_policy" {
+  description = "Chính sách lựa chọn Datastore Heartbeating cho HA: allFeasibleBackup, userSelectedDs, allFeasibleBackupWithUserPreference"
+  type        = string
+  default     = "allFeasibleBackup"
+}
+
+variable "ha_heartbeat_datastore_ids" {
+  description = "Danh sách ID các Datastore chỉ định làm heartbeat nếu chính sách là userSelectedDs hoặc allFeasibleBackupWithUserPreference"
+  type        = list(string)
+  default     = null
+}
+
+variable "vm_anti_affinity_rules" {
+  description = "Bản đồ các quy tắc DRS VM Anti-Affinity tách rời máy ảo dự phòng trên cụm (Mặc định: rỗng {})"
+  type = map(object({
+    virtual_machine_ids = list(string)
+    enabled             = optional(bool, true)
+    mandatory           = optional(bool, false)
+  }))
+  default = {}
+}
+
 # ------------------------------------------------------------------------------
 # 4. DANH SÁCH MÁY CHỦ ESXI NẠP VÀO QUẢN LÝ (HOST ONBOARDING)
 # ------------------------------------------------------------------------------
@@ -178,10 +200,12 @@ variable "enable_netioc" {
 }
 
 variable "vds_portgroups" {
-  description = "Bản đồ danh mục Distributed Port Groups (VLAN, Teaming, Traffic Shaping, Security)"
+  description = "Bản đồ danh mục Distributed Port Groups (VLAN, Teaming override, Traffic Shaping, Security)"
   type = map(object({
     vlan_id                           = number
     teaming_policy                    = optional(string, "loadbalance_loadbased")
+    active_uplinks                    = optional(list(string), null)
+    standby_uplinks                   = optional(list(string), null)
     shaping_enabled                   = optional(bool, false)
     ingress_shaping_average_bandwidth = optional(number, 100000000)
     ingress_shaping_peak_bandwidth    = optional(number, 200000000)
@@ -190,6 +214,28 @@ variable "vds_portgroups" {
     egress_shaping_peak_bandwidth     = optional(number, 200000000)
     egress_shaping_burst_size         = optional(number, 10485760)
     allow_promiscuous                 = optional(bool, false)
+    allow_forged_transmits            = optional(bool, false)
+    allow_mac_changes                 = optional(bool, false)
+  }))
+  default = {}
+}
+
+# ------------------------------------------------------------------------------
+# 5.1. CỔNG MẠNG VMKERNEL (VMKERNEL ADAPTERS - MULTI-NIC VMOTION & STORAGE)
+# ------------------------------------------------------------------------------
+variable "host_vnics" {
+  description = "Bản đồ danh mục cổng VMkernel NICs khởi tạo trên từng ESXi Host (Multi-NIC vMotion, vSAN, Management)"
+  type = map(object({
+    host_hostname  = string                              # Hostname trùng khớp với var.esxi_hosts
+    portgroup_type = optional(string, "distributed")     # "distributed" hoặc "standard"
+    portgroup_name = string                              # Tên Port Group gắn vNIC vào
+    services       = optional(list(string), ["vmotion"]) # Danh mục dịch vụ: "vmotion", "management", "vsan"
+    netstack       = optional(string, null)              # TCP/IP Stack: "defaultTcpipStack", "vmotion", "provisioning"
+    mtu            = optional(number, null)              # Kích thước MTU (ví dụ: 1500 hoặc 9000 cho Jumbo Frame)
+    dhcp           = optional(bool, false)               # Tự động nhận IP qua DHCP
+    ipv4_ip        = optional(string, null)              # Địa chỉ IP tĩnh IPv4
+    ipv4_netmask   = optional(string, null)              # Mặt nạ mạng IPv4 Subnet Mask (ví dụ: 255.255.255.0)
+    ipv4_gw        = optional(string, null)              # Cổng mặc định IPv4 Gateway
   }))
   default = {}
 }

@@ -40,8 +40,10 @@ resource "vsphere_distributed_port_group" "pg" {
   # Cấu hình VLAN ID (0: Untagged/Standard, 1-4094: VLAN Tagging)
   vlan_id = each.value.vlan_id
 
-  # Cấu hình Teaming và Failover
+  # Cấu hình Teaming và Failover (Cho phép ghi đè Uplink per-portgroup để cấu hình Multi-NIC vMotion)
   teaming_policy  = each.value.teaming_policy
+  active_uplinks  = each.value.active_uplinks != null ? each.value.active_uplinks : var.vds_active_uplinks
+  standby_uplinks = each.value.standby_uplinks != null ? each.value.standby_uplinks : var.vds_standby_uplinks
   notify_switches = true
   failback        = true
 
@@ -56,10 +58,10 @@ resource "vsphere_distributed_port_group" "pg" {
   egress_shaping_peak_bandwidth    = each.value.egress_shaping_peak_bandwidth
   egress_shaping_burst_size        = each.value.egress_shaping_burst_size
 
-  # Cấu hình bảo mật cổng mạng (Security Policies)
+  # Cấu hình bảo mật cổng mạng (Security Policies - NET-04)
   allow_promiscuous      = each.value.allow_promiscuous
-  allow_forged_transmits = false
-  allow_mac_changes      = false
+  allow_forged_transmits = each.value.allow_forged_transmits
+  allow_mac_changes      = each.value.allow_mac_changes
 }
 
 # ------------------------------------------------------------------------------
@@ -115,4 +117,40 @@ resource "vsphere_host_port_group" "standard_pg" {
   vlan_id             = each.value.vlan_id
 
   depends_on = [vsphere_host_virtual_switch.standard_vswitch]
+}
+
+# ------------------------------------------------------------------------------
+# C. CỔNG MẠNG VMKERNEL (VMKERNEL ADAPTERS / VNIC - MULTI-NIC VMOTION & STORAGE)
+# ------------------------------------------------------------------------------
+resource "vsphere_vnic" "vnic" {
+  for_each = var.host_vnics
+
+  host = vsphere_host.hosts[each.value.host_hostname].id
+
+  # Gán vào Distributed Port Group nếu portgroup_type là "distributed"
+  distributed_switch_port = each.value.portgroup_type == "distributed" && var.create_vds ? vsphere_distributed_virtual_switch.vds[0].id : null
+  distributed_port_group  = each.value.portgroup_type == "distributed" && var.create_vds ? vsphere_distributed_port_group.pg[each.value.portgroup_name].id : null
+
+  # Gán vào Standard Port Group nếu portgroup_type là "standard"
+  portgroup = each.value.portgroup_type == "standard" ? each.value.portgroup_name : null
+
+  services = each.value.services
+  netstack = each.value.netstack
+  mtu      = each.value.mtu
+
+  dynamic "ipv4" {
+    for_each = each.value.dhcp ? [1] : (each.value.ipv4_ip != null ? [1] : [])
+    content {
+      dhcp    = each.value.dhcp
+      ip      = each.value.dhcp ? null : each.value.ipv4_ip
+      netmask = each.value.dhcp ? null : each.value.ipv4_netmask
+      gw      = each.value.dhcp ? null : each.value.ipv4_gw
+    }
+  }
+
+  depends_on = [
+    vsphere_host.hosts,
+    vsphere_distributed_port_group.pg,
+    vsphere_host_port_group.standard_pg
+  ]
 }

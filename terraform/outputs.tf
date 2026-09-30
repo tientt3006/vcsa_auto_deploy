@@ -56,3 +56,13 @@ output "custom_roles" {
   description = "Bản đồ ID các vai trò phân quyền tùy biến đã khởi tạo"
   value       = { for k, v in vsphere_role.custom : k => v.id }
 }
+
+output "host_vnics" {
+  description = "Bản đồ ID các cổng VMkernel NICs đã khởi tạo trên các Host"
+  value       = { for k, v in vsphere_vnic.vnic : k => v.id }
+}
+
+output "vm_anti_affinity_rules" {
+  description = "Bản đồ ID các quy tắc DRS Anti-Affinity đã khởi tạo"
+  value       = { for k, v in vsphere_compute_cluster_vm_anti_affinity_rule.vm_anti_affinity : k => v.id }
+}

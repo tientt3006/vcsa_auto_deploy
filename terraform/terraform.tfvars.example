@@ -63,11 +63,34 @@ ha_enabled          = false
 ha_host_monitoring  = "enabled"                # enabled / disabled
 ha_vm_monitoring    = "vmMonitoringDisabled"   # vmMonitoringDisabled, vmMonitoringOnly, vmAndAppMonitoring
 
-# Cấu hình kiểm soát dung lượng dự phòng HA (HA Admission Control)
+# Cấu hình kiểm soát dung lượng dự phòng HA (HA Admission Control - HA-02)
 ha_admission_control_policy                 = "resourcePercentage" # resourcePercentage, slotPolicy, failoverHosts, disabled
 ha_admission_control_host_failure_tolerance = 1                    # Số host dự phòng sự cố
 ha_admission_control_cpu_percentage         = 25                   # Tỷ lệ phần trăm CPU dự trữ (%)
 ha_admission_control_ram_percentage         = 25                   # Tỷ lệ phần trăm RAM dự trữ (%)
+
+# Cấu hình kênh giám sát nhịp tim Datastore Heartbeating (HA-04)
+#   - allFeasibleBackup: vCenter tự động chọn các Datastore dùng chung khả dụng (Khuyến nghị cho phần lớn hạ tầng)
+#   - userSelectedDs: Bắt buộc dùng danh sách Datastore do người dùng chỉ định tại ha_heartbeat_datastore_ids
+#   - allFeasibleBackupWithUserPreference: Ưu tiên Datastore người dùng chỉ định, nếu thiếu tự động bổ sung
+ha_heartbeat_datastore_policy = "allFeasibleBackup"
+# ha_heartbeat_datastore_ids    = ["datastore-101", "datastore-102"] # Bỏ chú thích nếu dùng userSelectedDs
+
+# Quy tắc phân tách máy ảo dự phòng (DRS VM Anti-Affinity Rules - HA-05)
+# Tự động phân tách các cặp máy ảo chạy dự phòng không nằm chung trên một máy chủ vật lý.
+# Mặc định để rỗng {} nếu chưa khởi tạo VM. Điền ID máy ảo vào danh sách khi đã có VM.
+vm_anti_affinity_rules = {
+  # "Anti-Affinity-AD-DC" = {
+  #   virtual_machine_ids = ["vm-101", "vm-102"]
+  #   enabled             = true
+  #   mandatory           = false # false: Khuyến nghị mềm (Soft); true: Bắt buộc tuyệt đối (Hard)
+  # },
+  # "Anti-Affinity-DB-Cluster" = {
+  #   virtual_machine_ids = ["vm-201", "vm-202"]
+  #   enabled             = true
+  #   mandatory           = true
+  # }
+}
 
 # ------------------------------------------------------------------------------
 # 4. DANH SÁCH MÁY CHỦ ESXI CẦN NẠP VÀO QUẢN LÝ (ESXI HOST ONBOARDING)
@@ -114,8 +137,9 @@ enable_netioc = true
 # Danh mục các Distributed Port Groups trên vDS:
 #   - vlan_id: 0 (Untagged), 1 - 4094 (VLAN Tagging), 4095 (VLAN Trunking)
 #   - teaming_policy: loadbalance_loadbased, loadbalance_srcid, loadbalance_srcmac, failover_explicit
-#   - shaping_enabled: Bật/tắt kiểm soát giới hạn băng thông lưu lượng (Traffic Shaping)
-#   - allow_promiscuous: Cho phép chế độ nghe lén (Promiscuous Mode) cho VM router/firewall
+#   - active_uplinks / standby_uplinks: Ghi đè chỉ định cổng Uplink cho từng Port Group (Ví dụ cho Multi-NIC vMotion)
+#   - shaping_enabled: Bật/tắt kiểm soát giới hạn băng thông lưu lượng (Traffic Shaping - NET-05)
+#   - allow_promiscuous / allow_forged_transmits / allow_mac_changes: Chính sách bảo mật cổng mạng (NET-04)
 vds_portgroups = {
   "DSwitch-Mgmt-PG" = {
     vlan_id                           = 0
@@ -128,10 +152,15 @@ vds_portgroups = {
     egress_shaping_peak_bandwidth     = 200000000
     egress_shaping_burst_size         = 10485760
     allow_promiscuous                 = false
+    allow_forged_transmits            = false
+    allow_mac_changes                 = false
   },
-  "DSwitch-vMotion-PG" = {
+  # Port Group vMotion 1 (Gán Uplink 1 làm Active, Uplink 2 làm Standby)
+  "DSwitch-vMotion-PG1" = {
     vlan_id                           = 10
-    teaming_policy                    = "loadbalance_loadbased"
+    teaming_policy                    = "failover_explicit"
+    active_uplinks                    = ["uplink1"]
+    standby_uplinks                   = ["uplink2"]
     shaping_enabled                   = false
     ingress_shaping_average_bandwidth = 100000000
     ingress_shaping_peak_bandwidth    = 200000000
@@ -140,6 +169,25 @@ vds_portgroups = {
     egress_shaping_peak_bandwidth     = 200000000
     egress_shaping_burst_size         = 10485760
     allow_promiscuous                 = false
+    allow_forged_transmits            = false
+    allow_mac_changes                 = false
+  },
+  # Port Group vMotion 2 (Gán Uplink 2 làm Active, Uplink 1 làm Standby để chạy Multi-NIC vMotion)
+  "DSwitch-vMotion-PG2" = {
+    vlan_id                           = 10
+    teaming_policy                    = "failover_explicit"
+    active_uplinks                    = ["uplink2"]
+    standby_uplinks                   = ["uplink1"]
+    shaping_enabled                   = false
+    ingress_shaping_average_bandwidth = 100000000
+    ingress_shaping_peak_bandwidth    = 200000000
+    ingress_shaping_burst_size        = 10485760
+    egress_shaping_average_bandwidth  = 100000000
+    egress_shaping_peak_bandwidth     = 200000000
+    egress_shaping_burst_size         = 10485760
+    allow_promiscuous                 = false
+    allow_forged_transmits            = false
+    allow_mac_changes                 = false
   },
   "DSwitch-Workload-Prod-PG" = {
     vlan_id                           = 20
@@ -152,6 +200,8 @@ vds_portgroups = {
     egress_shaping_peak_bandwidth     = 1000000000
     egress_shaping_burst_size         = 20971520
     allow_promiscuous                 = false
+    allow_forged_transmits            = false
+    allow_mac_changes                 = false
   },
   "DSwitch-Workload-Dev-PG" = {
     vlan_id                           = 30
@@ -164,7 +214,45 @@ vds_portgroups = {
     egress_shaping_peak_bandwidth     = 200000000
     egress_shaping_burst_size         = 10485760
     allow_promiscuous                 = false
+    allow_forged_transmits            = false
+    allow_mac_changes                 = false
   }
+}
+
+# ------------------------------------------------------------------------------
+# 5.1. KHỞI TẠO CỔNG MẠNG VMKERNEL (VMKERNEL ADAPTERS - MULTI-NIC VMOTION - NET-06)
+# ------------------------------------------------------------------------------
+# Khởi tạo các cổng VMkernel (vmk) trên từng ESXi Host để cung cấp dịch vụ vMotion, Storage, Management.
+# Để đạt Multi-NIC vMotion chuẩn hãng VMware:
+#   - Khởi tạo 2 cổng VMkernel trên mỗi Host, gán vào 2 Port Group vMotion có Teaming so le (PG1 và PG2).
+#   - Đặt stack TCP/IP chuyên dụng: netstack = "vmotion".
+#   - services = ["vmotion"].
+# Mặc định để rỗng {} nếu muốn giữ nguyên các cổng VMkernel hiện có trên ESXi.
+host_vnics = {
+  # Cổng vMotion 1 cho ESXi Host 1
+  # "esxi1_vmotion_1" = {
+  #   host_hostname  = "<ESXI_1_IP_OR_FQDN>"
+  #   portgroup_type = "distributed"
+  #   portgroup_name = "DSwitch-vMotion-PG1"
+  #   services       = ["vmotion"]
+  #   netstack       = "vmotion"
+  #   mtu            = 1500                      # Đặt 9000 nếu switch vật lý hỗ trợ Jumbo Frame
+  #   dhcp           = false
+  #   ipv4_ip        = "10.0.10.11"
+  #   ipv4_netmask   = "255.255.255.0"
+  # },
+  # Cổng vMotion 2 cho ESXi Host 1 (Multi-NIC vMotion)
+  # "esxi1_vmotion_2" = {
+  #   host_hostname  = "<ESXI_1_IP_OR_FQDN>"
+  #   portgroup_type = "distributed"
+  #   portgroup_name = "DSwitch-vMotion-PG2"
+  #   services       = ["vmotion"]
+  #   netstack       = "vmotion"
+  #   mtu            = 1500
+  #   dhcp           = false
+  #   ipv4_ip        = "10.0.10.12"
+  #   ipv4_netmask   = "255.255.255.0"
+  # }
 }
 
 # ------------------------------------------------------------------------------
