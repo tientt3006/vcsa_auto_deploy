@@ -26,18 +26,21 @@ vsphere_password = "<VCSA_SSO_ADMIN_PASSWORD>"
 vsphere_allow_unverified_ssl = true
 
 # ------------------------------------------------------------------------------
-# 2. KHỞI TẠO DATACENTER VÀ HỆ THỐNG THƯ MỤC MÁY ẢO (VM FOLDERS)
+# 2. KHỞI TẠO DATACENTER VÀ HỆ THỐNG THƯ MỤC MÁY ẢO (VM FOLDERS - DIR-01)
 # ------------------------------------------------------------------------------
 # Tên Datacenter quản lý chính
 datacenter_name = "Datacenter-01"
 
-# Danh sách tên các thư mục máy ảo cần tạo phân cấp quản lý
+# Danh sách tên các thư mục máy ảo cần tạo phân cấp quản lý.
+# HỖ TRỢ THƯ MỤC LỒNG NHAU (Nested Folders) thông qua dấu gạch chéo '/':
+#   Ví dụ: "Workloads/Production", "Workloads/Staging" sẽ tự động tạo thư mục cha "Workloads"
+#   và đặt các thư mục con bên trong.
 vm_folders = [
   "Management",
   "Core-Infra",
-  "Workloads-Production",
-  "Workloads-Staging",
-  "Workloads-Dev",
+  "Workloads/Production",
+  "Workloads/Staging",
+  "Workloads/Dev",
   "Templates"
 ]
 
@@ -145,7 +148,12 @@ enable_netioc = true
 
 # Danh mục các Distributed Port Groups trên vDS:
 #   - vlan_id: 0 (Untagged), 1 - 4094 (VLAN Tagging), 4095 (VLAN Trunking)
-#   - teaming_policy: loadbalance_loadbased, loadbalance_srcid, loadbalance_srcmac, failover_explicit
+#   - teaming_policy (Chính sách cân bằng tải đối chiếu 1-1 với giao diện vSphere Client GUI):
+#       * loadbalance_loadbased : "Route based on physical NIC load" (Chỉ có trên vDS, tự động cân bằng theo tải thực tế card mạng)
+#       * loadbalance_srcid     : "Route based on originating virtual port" (Mặc định phổ biến nhất)
+#       * loadbalance_srcmac    : "Route based on source MAC hash"
+#       * loadbalance_ip        : "Route based on IP hash" (Yêu cầu switch vật lý cấu hình EtherChannel / LACP)
+#       * failover_explicit     : "Use explicit failover order" (Chỉ dùng card Active chính, card Standby dự phòng - dùng cho Multi-NIC vMotion)
 #   - active_uplinks / standby_uplinks: Ghi đè chỉ định cổng Uplink cho từng Port Group (Ví dụ cho Multi-NIC vMotion)
 #   - shaping_enabled: Bật/tắt kiểm soát giới hạn băng thông lưu lượng (Traffic Shaping - NET-05)
 #   - allow_promiscuous / allow_forged_transmits / allow_mac_changes: Chính sách bảo mật cổng mạng (NET-04)
@@ -232,10 +240,23 @@ vds_portgroups = {
 # 5.1. KHỞI TẠO CỔNG MẠNG VMKERNEL (VMKERNEL ADAPTERS - MULTI-NIC VMOTION - NET-06)
 # ------------------------------------------------------------------------------
 # Khởi tạo các cổng VMkernel (vmk) trên từng ESXi Host để cung cấp dịch vụ vMotion, Storage, Management.
-# Để đạt Multi-NIC vMotion chuẩn hãng VMware:
+#
+# Giải thích chi tiết hai tham số cốt lõi 'services' và 'netstack':
+#   - services: Tầng tính năng vSphere (Hộp kiểm 'Enabled services' trên giao diện vSphere Client):
+#       * ["vmotion"]   : Bật tính năng di trú máy ảo vMotion trên cổng này.
+#       * ["management"]: Cổng quản trị ESXi.
+#       * ["vsan"]      : Cổng lưu trữ phân tán vSAN.
+#   - netstack: Tầng ngăn xếp mạng TCP/IP của OS ESXi (Danh sách thả xuống 'TCP/IP stack' trên GUI):
+#       * null (hoặc "defaultTcpipStack"): Dùng chung bảng định tuyến và Gateway mặc định với Management.
+#         Phù hợp cho mạng phẳng L2, phòng lab, hoặc khi subnet vMotion không cần Gateway riêng.
+#       * "vmotion": Tách riêng một ngăn xếp TCP/IP độc lập (Bảng định tuyến riêng, Default Gateway riêng, bộ đệm riêng).
+#         Phù hợp cho mạng Enterprise L3, nơi dải IP vMotion cần Gateway riêng biệt mà không chạm tới Gateway của Management.
+#       * "provisioning": Ngăn xếp TCP/IP riêng cho thao tác nhân bản (clone) và di trú đĩa ảo.
+#
+# Để cấu hình Multi-NIC vMotion chuẩn hãng VMware:
 #   - Khởi tạo 2 cổng VMkernel trên mỗi Host, gán vào 2 Port Group vMotion có Teaming so le (PG1 và PG2).
-#   - Đặt stack TCP/IP chuyên dụng: netstack = "vmotion".
-#   - services = ["vmotion"].
+#   - Đặt services = ["vmotion"].
+#   - Đặt netstack = "vmotion" (nếu có Gateway riêng) hoặc để trống netstack (nếu dùng chung mạng phẳng L2).
 # Mặc định để rỗng {} nếu muốn giữ nguyên các cổng VMkernel hiện có trên ESXi.
 host_vnics = {
   # Cổng vMotion 1 cho ESXi Host 1
