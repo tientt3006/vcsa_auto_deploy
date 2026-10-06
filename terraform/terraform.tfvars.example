@@ -241,22 +241,35 @@ vds_portgroups = {
 # ------------------------------------------------------------------------------
 # Khởi tạo các cổng VMkernel (vmk) trên từng ESXi Host để cung cấp dịch vụ vMotion, Storage, Management.
 #
-# Giải thích chi tiết hai tham số cốt lõi 'services' và 'netstack':
-#   - services: Tầng tính năng vSphere (Hộp kiểm 'Enabled services' trên giao diện vSphere Client):
-#       * ["vmotion"]   : Bật tính năng di trú máy ảo vMotion trên cổng này.
-#       * ["management"]: Cổng quản trị ESXi.
-#       * ["vsan"]      : Cổng lưu trữ phân tán vSAN.
-#   - netstack: Tầng ngăn xếp mạng TCP/IP của OS ESXi (Danh sách thả xuống 'TCP/IP stack' trên GUI):
-#       * null (hoặc "defaultTcpipStack"): Dùng chung bảng định tuyến và Gateway mặc định với Management.
-#         Phù hợp cho mạng phẳng L2, phòng lab, hoặc khi subnet vMotion không cần Gateway riêng.
-#       * "vmotion": Tách riêng một ngăn xếp TCP/IP độc lập (Bảng định tuyến riêng, Default Gateway riêng, bộ đệm riêng).
-#         Phù hợp cho mạng Enterprise L3, nơi dải IP vMotion cần Gateway riêng biệt mà không chạm tới Gateway của Management.
-#       * "provisioning": Ngăn xếp TCP/IP riêng cho thao tác nhân bản (clone) và di trú đĩa ảo.
+# Đối chiếu chi tiết hai tham số 'services' và 'netstack' với giao diện vSphere Client GUI:
+#
+# 1. Tham số 'netstack' (Danh sách thả xuống 'TCP/IP stack' trên GUI):
+#    - null hoặc "defaultTcpipStack" (GUI: "Default"): Dùng chung bảng định tuyến, Gateway và DNS với Management.
+#      Phù hợp cho: Mạng phẳng L2, phòng lab, hoặc khi vMotion/Storage không cần Gateway định tuyến L3 riêng.
+#    - "vmotion" (GUI: "vMotion"): Ngăn xếp TCP/IP chuyên dụng cho vMotion (Bảng định tuyến riêng, Gateway riêng, bộ đệm riêng).
+#      Phù hợp cho: Mạng Enterprise L3, nơi dải IP vMotion cần Gateway riêng biệt tách khỏi Management.
+#    - "provisioning" (GUI: "Provisioning"): Ngăn xếp riêng cho sao chép máy ảo (VM clone), tạo snapshot và cold migration.
+#    - "ops" (GUI: "ops"): Ngăn xếp vận hành quản trị nội bộ phân hệ ảo hóa mạng VMware NSX.
+#    - "mirror" (GUI: "mirror"): Ngăn xếp chuyên dụng cho sao chép cổng và phân tích gói tin (Port Mirroring / Packet Capture).
+#
+# 2. Tham số 'services' (Danh sách hộp kiểm 'Available services / Enabled services' trên GUI):
+#    LƯU Ý KỸ THUẬT QUAN TRỌNG VỀ TERRAFORM PROVIDER:
+#    Trên giao diện vSphere 7/8 hiển thị tới 11 dịch vụ:
+#      * Nhóm hạ tầng cơ bản : vMotion, Management, vSAN
+#      * Nhóm sao chép & dự phòng : Provisioning, Fault Tolerance logging, vSphere Replication, vSphere Replication NFC
+#      * Nhóm sao lưu & mở rộng  : vSAN Witness, vSphere Backup NFC, NVMe over TCP, NVMe over RDMA
+#    TUY NHIÊN, provider chính thức của Terraform (hashicorp/vsphere) áp dụng kiểm tra nghiêm ngặt (Strict Schema Validation)
+#    và CHỈ CHẤP NHẬN 3 dịch vụ cơ sở sau:
+#      - "vmotion"    : Kích hoạt dịch vụ di trú máy ảo vMotion.
+#      - "management" : Kích hoạt dịch vụ quản trị máy chủ ESXi (lắng nghe kết nối vCenter/SSH).
+#      - "vsan"       : Kích hoạt lưu lượng đồng bộ đĩa cụm vSAN.
+#    (Nếu nhập các dịch vụ ngoài 3 giá trị trên, Terraform sẽ báo lỗi validation. Các dịch vụ mở rộng như Backup NFC,
+#     NVMe over TCP, Replication được kích hoạt qua Host Profile hoặc PowerCLI).
 #
 # Để cấu hình Multi-NIC vMotion chuẩn hãng VMware:
 #   - Khởi tạo 2 cổng VMkernel trên mỗi Host, gán vào 2 Port Group vMotion có Teaming so le (PG1 và PG2).
 #   - Đặt services = ["vmotion"].
-#   - Đặt netstack = "vmotion" (nếu có Gateway riêng) hoặc để trống netstack (nếu dùng chung mạng phẳng L2).
+#   - Đặt netstack = "vmotion" (nếu mạng L3 có Gateway riêng) hoặc để null (nếu mạng phẳng L2).
 # Mặc định để rỗng {} nếu muốn giữ nguyên các cổng VMkernel hiện có trên ESXi.
 host_vnics = {
   # Cổng vMotion 1 cho ESXi Host 1

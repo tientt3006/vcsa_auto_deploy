@@ -235,8 +235,8 @@ variable "host_vnics" {
     host_hostname  = string                              # Hostname trùng khớp với var.esxi_hosts
     portgroup_type = optional(string, "distributed")     # "distributed" hoặc "standard"
     portgroup_name = string                              # Tên Port Group gắn vNIC vào
-    services       = optional(list(string), ["vmotion"]) # Danh mục dịch vụ: "vmotion", "management", "vsan"
-    netstack       = optional(string, null)              # TCP/IP Stack: "defaultTcpipStack", "vmotion", "provisioning"
+    services       = optional(list(string), ["vmotion"]) # Danh mục dịch vụ hỗ trợ trong Terraform: "vmotion", "management", "vsan"
+    netstack       = optional(string, null)              # TCP/IP Stack: null (defaultTcpipStack), "vmotion", "provisioning", "ops", "mirror"
     mtu            = optional(number, null)              # Kích thước MTU (ví dụ: 1500 hoặc 9000 cho Jumbo Frame)
     dhcp           = optional(bool, false)               # Tự động nhận IP qua DHCP
     ipv4_ip        = optional(string, null)              # Địa chỉ IP tĩnh IPv4
